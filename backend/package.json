@@ -1,0 +1,13 @@
+{
+  "name": "fpl-name-search",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Name -> FPL team ID search service (zero-dependency).",
+  "scripts": {
+    "start": "node server.js",
+    "crawl": "node crawl.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

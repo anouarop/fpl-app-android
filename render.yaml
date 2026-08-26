@@ -1,0 +1,17 @@
+# Render Blueprint — provisions the name-search service with one click.
+# Connect a GitHub repo containing this file, then choose "Create Blueprint" in Render.
+
+services:
+  - type: web
+    name: fpl-name-search
+    runtime: node
+    rootDir: backend
+    plan: free
+    buildCommand: "npm install"
+    startCommand: "npm start"
+    healthCheckPath: /health
+    envVars:
+      - key: PORT
+        value: 8080
+      - key: DATA_FILE
+        value: data.json
