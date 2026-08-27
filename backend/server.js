@@ -20,7 +20,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const { URL } = require('url');
-const { normalize, fetchJson, loadDb, sortManagers, saveDb } = require('./lib');
+const { normalize, fetchJson, loadDb, sortManagers, saveDb, getPool, ensureSchema, dbLoadAll, dbUpsert, dbSaveMeta } = require('./lib');
 
 const PORT = Number(process.env.PORT) || 8080;
 const DATA_FILE = process.env.DATA_FILE || path.join(__dirname, 'data.json');
@@ -46,8 +46,8 @@ function rebuildIndex() {
   }));
 }
 
-function loadFromDisk() {
-  db = loadDb(DATA_FILE);
+async function loadFromDb() {
+  db = await dbLoadAll(DATA_FILE);
   // If no crawl metadata exists (e.g. an index built by an older crawl.js), estimate it.
   if (!(db.meta && Number(db.meta.crawledPage) > 0)) {
     db.meta = { crawledPage: Math.round(db.managers.length / 50) };
@@ -60,19 +60,52 @@ function loadFromDisk() {
   rebuildIndex();
 }
 
-// Reload from disk if an external writer (e.g. crawl.js) has touched the file.
-function ensureFresh() {
+// Reload from Postgres (throttled) so crawler writes become visible. On the file
+// fallback, reload only when the on-disk file has changed.
+let lastReloadMs = 0;
+async function ensureFresh() {
+  const pool = getPool();
+  if (pool) {
+    if (crawling) return;
+    const now = Date.now();
+    if (now - lastReloadMs < 30_000) return;
+    lastReloadMs = now;
+    db = await dbLoadAll(DATA_FILE);
+    rebuildIndex();
+    return;
+  }
   try {
     const mtime = fs.statSync(DATA_FILE).mtimeMs;
-    if (mtime !== loadedMtimeMs) loadFromDisk();
+    if (mtime !== loadedMtimeMs) loadFromDbSync();
   } catch {
     /* keep current in-memory data */
   }
 }
 
-function save() {
+// Synchronous file reload used only in the no-DATABASE_URL (file) fallback.
+function loadFromDbSync() {
+  db = loadDb(DATA_FILE);
+  if (!(db.meta && Number(db.meta.crawledPage) > 0)) {
+    db.meta = { crawledPage: Math.round(db.managers.length / 50) };
+  }
+  try {
+    loadedMtimeMs = fs.statSync(DATA_FILE).mtimeMs;
+  } catch {
+    loadedMtimeMs = 0;
+  }
+  rebuildIndex();
+}
+
+async function save(batch) {
   sortManagers(db.managers);
-  loadedMtimeMs = saveDb(db, DATA_FILE);
+  const pool = getPool();
+  if (pool) {
+    if (batch && batch.length) await dbUpsert(batch);
+    await dbSaveMeta(db.meta.crawledPage);
+    loadedMtimeMs = Date.now();
+  } else {
+    loadedMtimeMs = saveDb(db, DATA_FILE);
+  }
   rebuildIndex();
 }
 
@@ -148,6 +181,7 @@ async function crawlOnce() {
   crawling = true;
   try {
     const map = new Map(db.managers.map((m) => [m.teamId, m]));
+    let pending = [];
     let page = (Number(db.meta.crawledPage) || 0) + 1;
     for (;; page++) {
       const url = `https://fantasy.premierleague.com/api/leagues-classic/${OVERALL_LEAGUE_ID}/standings/?page_standings=${page}`;
@@ -164,21 +198,25 @@ async function crawlOnce() {
       if (rows.length === 0) break;
       for (const r of rows) {
         if (!r.entry) continue;
-        map.set(r.entry, {
+        const m = {
           teamId: r.entry,
           managerName: r.player_name || '',
           teamName: r.entry_name || '',
           rank: r.rank || 0,
-        });
+        };
+        map.set(r.entry, m);
+        pending.push(m);
       }
       db.meta.crawledPage = page;
       if (page % 50 === 0) {
         db.managers = Array.from(map.values());
-        save();
+        await save(pending);
+        pending = [];
       }
       if (!hasNext) {
         db.managers = Array.from(map.values());
-        save();
+        await save(pending);
+        pending = [];
         break;
       }
       await sleep(CRAWL_DELAY_MS);
@@ -208,13 +246,13 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (req.method === 'GET' && route === '/health') {
-    ensureFresh();
+    await ensureFresh();
     send(res, 200, { ok: true, managers: db.managers.length, crawledPage: db.meta.crawledPage });
     return;
   }
 
   if (req.method === 'GET' && route === '/search') {
-    ensureFresh();
+    await ensureFresh();
     const q = normalize(url.searchParams.get('q') || '').trim();
     const limit = Math.min(Number(url.searchParams.get('limit')) || 20, 50);
     if (!q) {
@@ -226,7 +264,7 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (req.method === 'POST' && route === '/register') {
-    ensureFresh();
+    await ensureFresh();
     const raw = await readBody(req);
     try {
       const data = JSON.parse(raw || '{}');
@@ -236,14 +274,15 @@ const server = http.createServer(async (req, res) => {
         send(res, 400, { error: 'teamId and managerName are required' });
         return;
       }
-      db.managers = db.managers.filter((m) => m.teamId !== teamId);
-      db.managers.push({
+      const m = {
         teamId,
         managerName,
         teamName: String(data.teamName || '').trim(),
-        rank: data.rank != null ? Number(data.rank) : undefined,
-      });
-      save();
+        rank: data.rank != null ? Number(data.rank) : 0,
+      };
+      db.managers = db.managers.filter((x) => x.teamId !== teamId);
+      db.managers.push(m);
+      await save([m]);
       send(res, 200, { ok: true });
     } catch {
       send(res, 400, { error: 'invalid JSON body' });
@@ -254,8 +293,11 @@ const server = http.createServer(async (req, res) => {
   send(res, 404, { error: 'not found' });
 });
 
-loadFromDisk();
-server.listen(PORT, () => {
-  console.log(`fpl-name-search listening on :${PORT} (${db.managers.length} managers indexed)`);
-  startCrawler();
-});
+(async () => {
+  await ensureSchema().catch((e) => console.log('ensureSchema failed:', e.message));
+  await loadFromDb().catch((e) => console.log('load failed:', e.message));
+  server.listen(PORT, () => {
+    console.log(`fpl-name-search listening on :${PORT} (${db.managers.length} managers indexed)`);
+    startCrawler();
+  });
+})();

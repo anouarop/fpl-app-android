@@ -10,6 +10,15 @@ The `server.js` and `crawl.js` scripts share helpers from `lib.js` (normalizatio
 normalized names/teams (with a small LRU cache), so a query does not re-normalize the whole index.
 A numeric query is treated as a team-ID lookup.
 
+## Storage: Postgres (recommended) vs file
+
+By default the index is stored in `data.json` on disk. On hosts with ephemeral disks (e.g. Render's
+free tier) that file is wiped on every redeploy, so the index must be re-crawled each time. To make
+the index **survive redeploys**, set `DATABASE_URL` to a Postgres connection string (Supabase free
+tier works well). When `DATABASE_URL` is present the service stores managers in a `managers` table and
+crawl progress in `crawl_meta`, creating the schema automatically on startup. With no `DATABASE_URL`
+it falls back to the `data.json` file (handy for local dev).
+
 ## Endpoints
 
 | Method | Path | Description |

@@ -1,8 +1,7 @@
-// Crawler: populates data.json with FPL managers from the public "Overall" league
-// (id 314). The standings endpoint is paginated (50 per page) and unauthenticated.
-// The server reloads data.json on change, so run this alongside `node server.js`.
-// Crawl progress is recorded in data.json's `meta.crawledPage`, so the server's own
-// background crawler resumes from where this left off instead of restarting at page 1.
+// Crawler: populates the manager index (Postgres if DATABASE_URL is set, otherwise
+// data.json) with FPL managers from the public "Overall" league (id 314). The
+// standings endpoint is paginated (50 per page) and unauthenticated. Run alongside
+// `node server.js` only when not using the server's built-in crawler.
 //
 // Usage:  node crawl.js [startPage] [endPage] [dataFile]
 //   e.g.  node crawl.js 1 2000        # crawl pages 1..2000 (~100k teams)
@@ -11,7 +10,7 @@
 'use strict';
 
 const path = require('path');
-const { fetchJson, loadDb, sortManagers, saveDb } = require('./lib');
+const { fetchJson, dbLoadAll, dbUpsert, dbSaveMeta, sortManagers } = require('./lib');
 
 const LEAGUE_ID = 314;
 const DATA_FILE = process.argv[4] || path.join(__dirname, 'data.json');
@@ -23,27 +22,30 @@ async function crawlPage(page) {
   const url = `https://fantasy.premierleague.com/api/leagues-classic/${LEAGUE_ID}/standings/?page_standings=${page}`;
   const json = await fetchJson(url);
   const rows = (json && json.standings && json.standings.results) || [];
-  const hasNext = !!(json && json.standings && json.standings.has_next);
+  const hasNext = !!(json && json.standings && json.standings.hasNext);
   return { rows, hasNext };
 }
 
 async function main() {
-  const db = loadDb(DATA_FILE);
+  const db = await dbLoadAll(DATA_FILE);
   const byId = new Map(db.managers.map((m) => [m.teamId, m]));
 
   let added = 0;
   let lastPage = start;
+  let pending = [];
   for (let page = start; page <= end; page++) {
     try {
       const { rows, hasNext } = await crawlPage(page);
       for (const r of rows) {
         if (!r.entry) continue;
-        byId.set(r.entry, {
+        const m = {
           teamId: r.entry,
           managerName: r.player_name || '',
           teamName: r.entry_name || '',
           rank: r.rank || 0,
-        });
+        };
+        byId.set(r.entry, m);
+        pending.push(m);
         added++;
       }
       lastPage = page;
@@ -51,7 +53,9 @@ async function main() {
       if (page % 50 === 0 || !hasNext) {
         db.managers = sortManagers(Array.from(byId.values()));
         db.meta = { crawledPage: page };
-        saveDb(db, DATA_FILE);
+        await dbUpsert(pending);
+        await dbSaveMeta(page);
+        pending = [];
       }
       if (!hasNext) {
         process.stdout.write('\nreached end of standings\n');
@@ -65,8 +69,12 @@ async function main() {
 
   db.managers = sortManagers(Array.from(byId.values()));
   db.meta = { crawledPage: lastPage };
-  saveDb(db, DATA_FILE);
-  process.stdout.write(`\ndone — ${db.managers.length} teams saved to ${DATA_FILE} (${added} added)\n`);
+  await dbUpsert(pending);
+  await dbSaveMeta(lastPage);
+  process.stdout.write(`\ndone — ${byId.size} teams processed (${added} added)\n`);
 }
 
-main();
+main().catch((e) => {
+  console.error(e);
+  process.exit(1);
+});

@@ -21,6 +21,12 @@ services:
         value: 8080
       - key: DATA_FILE
         value: data.json
+      # Set your Supabase Postgres connection string here in the Render dashboard
+      # (Environment -> fpl-name-search -> Add Environment Variable). `sync: false`
+      # keeps your value across git deploys. When set, the manager index is stored
+      # in Postgres instead of the ephemeral disk (survives redeploys).
+      - key: DATABASE_URL
+        sync: false
 
   - type: web
     name: fpl-live-events

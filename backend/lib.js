@@ -1,5 +1,5 @@
 // Shared helpers for the FPL name-search service and its crawler.
-// Zero runtime dependencies; requires Node 18+.
+// Zero runtime dependencies unless DATABASE_URL is set, in which case `pg` is used.
 
 'use strict';
 
@@ -79,4 +79,122 @@ function saveDb(db, dataFile) {
   return fs.statSync(dataFile).mtimeMs;
 }
 
-module.exports = { normalize, fetchJson, loadDb, sortManagers, saveDb };
+// ---------------------------------------------------------------------------
+// Optional Postgres storage (used when DATABASE_URL is set, e.g. Supabase free
+// tier). This survives redeploys, unlike the ephemeral Render disk.
+// ---------------------------------------------------------------------------
+
+let _pool = null;
+let _poolInit = false;
+
+/** Returns a pg Pool when DATABASE_URL is configured, else null (file fallback). */
+function getPool() {
+  if (_poolInit) return _pool;
+  _poolInit = true;
+  const url = process.env.DATABASE_URL;
+  if (!url) {
+    _pool = null;
+    return null;
+  }
+  try {
+    const { Pool } = require('pg');
+    _pool = new Pool({
+      connectionString: url,
+      ssl: { rejectUnauthorized: false },
+      max: 5,
+    });
+  } catch (e) {
+    console.log('pg unavailable, falling back to file storage:', e.message);
+    _pool = null;
+  }
+  return _pool;
+}
+
+/** Create the tables if they don't exist. Safe to call on every startup. */
+async function ensureSchema() {
+  const pool = getPool();
+  if (!pool) return;
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS managers (
+      team_id INTEGER PRIMARY KEY,
+      manager_name TEXT NOT NULL DEFAULT '',
+      team_name TEXT NOT NULL DEFAULT '',
+      rank INTEGER NOT NULL DEFAULT 0
+    )
+  `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS crawl_meta (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL DEFAULT ''
+    )
+  `);
+}
+
+/** Load the full index from Postgres, or from disk when no DATABASE_URL is set. */
+async function dbLoadAll(dataFile) {
+  const pool = getPool();
+  if (pool) {
+    const { rows } = await pool.query(
+      'SELECT team_id AS "teamId", manager_name AS "managerName", team_name AS "teamName", rank FROM managers',
+    );
+    let crawledPage = 0;
+    try {
+      const r = await pool.query("SELECT value FROM crawl_meta WHERE key = 'crawledPage'");
+      if (r.rows[0]) crawledPage = Number(r.rows[0].value) || 0;
+    } catch {
+      /* no meta yet */
+    }
+    return { managers: rows, meta: { crawledPage } };
+  }
+  return loadDb(dataFile);
+}
+
+/** Batch upsert managers (max 500/query) into Postgres. No-op on file fallback. */
+async function dbUpsert(managers) {
+  const pool = getPool();
+  if (!pool || !managers || managers.length === 0) return;
+  const BATCH = 500;
+  for (let i = 0; i < managers.length; i += BATCH) {
+    const chunk = managers.slice(i, i + BATCH);
+    const values = [];
+    const placeholders = [];
+    let p = 1;
+    for (const m of chunk) {
+      placeholders.push(`($${p}, $${p + 1}, $${p + 2}, $${p + 3})`);
+      values.push(m.teamId, m.managerName || '', m.teamName || '', m.rank || 0);
+      p += 4;
+    }
+    const sql = `
+      INSERT INTO managers (team_id, manager_name, team_name, rank) VALUES ${placeholders.join(',')}
+      ON CONFLICT (team_id) DO UPDATE SET
+        manager_name = EXCLUDED.manager_name,
+        team_name = EXCLUDED.team_name,
+        rank = EXCLUDED.rank
+    `;
+    await pool.query(sql, values);
+  }
+}
+
+/** Persist crawl progress (last crawled page). No-op on file fallback. */
+async function dbSaveMeta(page) {
+  const pool = getPool();
+  if (!pool) return;
+  await pool.query(
+    `INSERT INTO crawl_meta (key, value) VALUES ('crawledPage', $1)
+     ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
+    [String(page)],
+  );
+}
+
+module.exports = {
+  normalize,
+  fetchJson,
+  loadDb,
+  sortManagers,
+  saveDb,
+  getPool,
+  ensureSchema,
+  dbLoadAll,
+  dbUpsert,
+  dbSaveMeta,
+};
