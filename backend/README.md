@@ -5,6 +5,11 @@ API has no name-search endpoint, so this service maintains an index. By default 
 public Overall league** in the background to grow the index, and the app registers every team whose
 owner completes onboarding.
 
+The `server.js` and `crawl.js` scripts share helpers from `lib.js` (normalization, gzip-aware
+`fetchJson`, atomic/compact persistence). Search runs against a precomputed in-memory index of
+normalized names/teams (with a small LRU cache), so a query does not re-normalize the whole index.
+A numeric query is treated as a team-ID lookup.
+
 ## Endpoints
 
 | Method | Path | Description |
@@ -24,6 +29,10 @@ The background crawler runs automatically (disable with `CRAWL=off`). To crawl m
 ```bash
 node crawl.js 1 2000      # crawl pages 1..2000 (~100k teams, ~50 per page)
 ```
+
+`crawl.js` records its progress in `data.json`'s `meta.crawledPage`, so the server's background
+crawler resumes from there instead of restarting at page 1. Saves are atomic (temp file + rename)
+and written as compact JSON.
 
 ## Deploy to Render (free)
 
