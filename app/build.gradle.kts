@@ -26,6 +26,12 @@ android {
 
         val liveBaseUrl = (project.findProperty("liveBaseUrl") as String?) ?: ""
         buildConfigField("String", "LIVE_BASE_URL", "\"$liveBaseUrl\"")
+
+        val supabaseUrl = (project.findProperty("supabaseUrl") as String?) ?: ""
+        buildConfigField("String", "SUPABASE_URL", "\"$supabaseUrl\"")
+
+        val supabaseAnonKey = (project.findProperty("supabaseAnonKey") as String?) ?: ""
+        buildConfigField("String", "SUPABASE_ANON_KEY", "\"$supabaseAnonKey\"")
     }
 
     signingConfigs {

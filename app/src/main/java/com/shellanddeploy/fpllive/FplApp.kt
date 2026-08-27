@@ -10,6 +10,8 @@ import com.shellanddeploy.fpllive.data.db.FplDatabase
 import com.shellanddeploy.fpllive.data.live.HttpLiveRepository
 import com.shellanddeploy.fpllive.data.live.LiveRepository
 import com.shellanddeploy.fpllive.data.live.NoOpLiveRepository
+import com.shellanddeploy.fpllive.data.chat.HttpChatRepository
+import com.shellanddeploy.fpllive.data.chat.ChatRepository
 import com.shellanddeploy.fpllive.data.namesearch.HttpNameSearchRepository
 import com.shellanddeploy.fpllive.data.namesearch.NameSearchRepository
 import com.shellanddeploy.fpllive.data.namesearch.NoOpNameSearchRepository
@@ -30,6 +32,8 @@ class FplApp : Application() {
         private set
     lateinit var liveRepository: LiveRepository
         private set
+    lateinit var chatRepository: ChatRepository
+        private set
 
     override fun onCreate() {
         super.onCreate()
@@ -48,5 +52,6 @@ class FplApp : Application() {
         } else {
             NoOpLiveRepository
         }
+        chatRepository = HttpChatRepository()
     }
 }

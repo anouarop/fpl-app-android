@@ -7,6 +7,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material.icons.filled.ChatBubble
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.Home
@@ -40,6 +41,8 @@ import com.shellanddeploy.fpllive.ui.gameweeks.GameweekFixturesViewModel
 import com.shellanddeploy.fpllive.ui.gameweeks.GameweeksScreen
 import com.shellanddeploy.fpllive.ui.gameweeks.GameweeksViewModel
 import com.shellanddeploy.fpllive.ui.history.HistoryScreen
+import com.shellanddeploy.fpllive.ui.chat.ChatScreen
+import com.shellanddeploy.fpllive.ui.chat.ChatViewModel
 import com.shellanddeploy.fpllive.ui.history.HistoryViewModel
 import com.shellanddeploy.fpllive.ui.home.HomeScreen
 import com.shellanddeploy.fpllive.ui.home.HomeViewModel
@@ -85,13 +88,14 @@ private sealed class Tab(
 ) {
     data object Home : Tab("home", "home", "Home", Icons.Filled.Home)
     data object Live : Tab("live", "live", "Live", Icons.Filled.Bolt)
+    data object Chat : Tab("chat", "chat", "Chat", Icons.Filled.ChatBubble)
     data object Players : Tab("players", "players", "Players", Icons.Filled.People)
     data object Fixtures : Tab("fixtures", "fixtures", "Fixtures", Icons.Filled.CalendarMonth)
     data object Team : Tab("team/{teamId}", "team/-1", "Team", Icons.Filled.Groups)
     data object Settings : Tab("settings", "settings", "Settings", Icons.Filled.Settings)
 }
 
-private val tabs = listOf(Tab.Home, Tab.Live, Tab.Players, Tab.Fixtures, Tab.Team, Tab.Settings)
+private val tabs = listOf(Tab.Home, Tab.Live, Tab.Chat, Tab.Players, Tab.Fixtures, Tab.Team, Tab.Settings)
 
 @Composable
 private fun AppRoot() {
@@ -162,7 +166,9 @@ private fun MainScaffold() {
 
             composable("live") {
                 val vm: LiveViewModel = fplViewModel { LiveViewModel(it.liveRepository, it.settings) }
-                LiveScreen(viewModel = vm)
+            }
+            composable("chat") {
+                val vm: ChatViewModel = fplViewModel { ChatViewModel(it.chatRepository, it.settings) }
             }
 
             composable("fixtures") {
