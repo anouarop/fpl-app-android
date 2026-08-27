@@ -142,7 +142,6 @@ if (firebaseAppId.isNotBlank() && firebaseCreds.isNotBlank()) {
     firebaseAppDistribution {
         appId = firebaseAppId
         serviceCredentialsFile = rootProject.file(firebaseCreds).absolutePath
-        artifactType = "APK"
         groups = firebaseTesters
         releaseNotes = providers.exec {
             commandLine("git", "log", "-1", "--pretty=%s")
