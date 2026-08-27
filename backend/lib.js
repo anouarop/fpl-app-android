@@ -112,6 +112,8 @@ function getPool() {
       // connection at startup would block server.listen and cause a 502).
       connectionTimeoutMillis: 5000,
     });
+    // Never let a transient Postgres error crash the whole process.
+    _pool.on('error', (e) => console.log('pg pool error:', e.message));
   } catch (e) {
     console.log('pg unavailable, falling back to file storage:', e.message);
     _pool = null;
