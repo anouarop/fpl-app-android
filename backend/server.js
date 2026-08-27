@@ -298,6 +298,7 @@ const server = http.createServer(async (req, res) => {
   await loadFromDb().catch((e) => console.log('load failed:', e.message));
   server.listen(PORT, () => {
     console.log(`fpl-name-search listening on :${PORT} (${db.managers.length} managers indexed)`);
+    console.log(`storage backend: ${getPool() ? 'Postgres (Supabase)' : 'local file (ephemeral — set DATABASE_URL)'}`);
     startCrawler();
   });
 })();
