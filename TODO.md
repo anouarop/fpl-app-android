@@ -102,8 +102,10 @@ node backend/server.js
 node backend-live/server.js
 ```
 
-`gradle.properties` currently points at the dev machine (`http://192.168.68.185:8080/8081`); the
-debug manifest allows cleartext, so local HTTP works in debug builds only.
+`gradle.properties` now points at the Render hosts (`https://fpl-name-search.onrender.com` /
+`https://fpl-live-events.onrender.com`), so the app no longer depends on any laptop. To develop
+against local backends, temporarily set those two properties back to `http://<lan-ip>:8080/8081`
+(the debug manifest allows cleartext, so local HTTP works in debug builds only).
 
 ---
 
