@@ -293,12 +293,20 @@ const server = http.createServer(async (req, res) => {
   send(res, 404, { error: 'not found' });
 });
 
-(async () => {
-  await ensureSchema().catch((e) => console.log('ensureSchema failed:', e.message));
-  await loadFromDb().catch((e) => console.log('load failed:', e.message));
-  server.listen(PORT, () => {
-    console.log(`fpl-name-search listening on :${PORT} (${db.managers.length} managers indexed)`);
-    console.log(`storage backend: ${getPool() ? 'Postgres (Supabase)' : 'local file (ephemeral — set DATABASE_URL)'}`);
+// Start listening immediately so Render's healthcheck passes (no 502). DB
+// init + the crawler run afterward and never block startup — if Postgres is
+// slow/unreachable the server stays up and degrades gracefully.
+server.listen(PORT, () => {
+  console.log(`fpl-name-search listening on :${PORT}`);
+  console.log(`storage backend: ${getPool() ? 'Postgres (Supabase)' : 'local file (ephemeral — set DATABASE_URL)'}`);
+  initDbAndCrawl();
+});
+
+function initDbAndCrawl() {
+  (async () => {
+    await ensureSchema().catch((e) => console.log('ensureSchema failed:', e.message));
+    await loadFromDb().catch((e) => console.log('load failed:', e.message));
+    console.log(`loaded ${db.managers.length} managers from storage`);
     startCrawler();
-  });
-})();
+  })();
+}

@@ -108,6 +108,9 @@ function getPool() {
       connectionString: url,
       ssl: { rejectUnauthorized: false },
       max: 5,
+      // Fail fast instead of hanging if Supabase is unreachable (a hung
+      // connection at startup would block server.listen and cause a 502).
+      connectionTimeoutMillis: 5000,
     });
   } catch (e) {
     console.log('pg unavailable, falling back to file storage:', e.message);
