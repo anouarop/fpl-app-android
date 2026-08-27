@@ -22,6 +22,9 @@ android {
 
         val nameSearchBaseUrl = (project.findProperty("nameSearchBaseUrl") as String?) ?: ""
         buildConfigField("String", "NAME_SEARCH_BASE_URL", "\"$nameSearchBaseUrl\"")
+
+        val liveBaseUrl = (project.findProperty("liveBaseUrl") as String?) ?: ""
+        buildConfigField("String", "LIVE_BASE_URL", "\"$liveBaseUrl\"")
     }
 
     signingConfigs {
