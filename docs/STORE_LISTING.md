@@ -1,7 +1,7 @@
 # Play Store listing
 
 > Before you publish, rename the app to avoid the "FPL" / "Fantasy Premier League" trademark.
-> The current label is "FPL Live" (`app/src/main/res/values/strings.xml`) and the package is
+> The current label is "FPL Pulse" (`app/src/main/res/values/strings.xml`) and the package is
 > `com.shellanddeploy.fpllive`. Consider a neutral name and description (see below). You can
 > change the visible app name in `strings.xml` without changing the package name.
 
