@@ -38,14 +38,11 @@ Everything below is uncommitted on top of the single `Initial commit`. **Commit 
 
 ## 2. Step-by-step to finish (do in this order)
 
-### Step 1 — Commit everything (can delegate to an AI/assistant)
-Commit in clean chunks: backend-live (new), backend refactor, app live feature, app settings/squad
-features. Verify `./gradlew testDebugUnitTest` passes before committing.
+### Step 1 — Commit everything ✅ DONE
+Committed in clean chunks (f5596d8, 85da012, 1d27ab7, 932870f). `testDebugUnitTest` passes.
 
-### Step 2 — Create a GitHub repo and push (manual, ~10 min)
-- Create a **private** GitHub repo.
-- Push this repo (Render deploys from GitHub, so this is required anyway).
-- `git remote add origin <url> && git push -u origin main`
+### Step 2 — Create a GitHub repo and push ✅ DONE
+Repo `github.com/anouarop/fpl-app-android` exists; pushed `main` (932870f).
 
 ### Step 3 — Deploy the two backends (manual, ~15 min)
 - Render → **New → Blueprint** → connect the GitHub repo.
@@ -64,6 +61,10 @@ source env.sh
 ./gradlew bundleRelease      # or assembleRelease for a test APK
 ```
 Note: the release manifest blocks cleartext HTTP, so these **must** be HTTPS.
+
+Build validated locally: `bundleRelease` succeeds and produces
+`app/build/outputs/bundle/release/app-release.aab` (release-signed). Still points at the dev
+HTTP URLs until Step 3 URLs are known — rebuild after updating `gradle.properties`.
 
 ### Step 5 — Publish to Google Play (manual, one-time setup)
 1. Create a **Google Play Console** account ($25 one-time).
