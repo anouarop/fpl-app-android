@@ -6,6 +6,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.Home
@@ -32,8 +33,6 @@ import com.shellanddeploy.fpllive.data.datastore.Settings
 import com.shellanddeploy.fpllive.di.fplApp
 import com.shellanddeploy.fpllive.di.fplViewModel
 import com.shellanddeploy.fpllive.di.fplViewModelWithArgs
-import com.shellanddeploy.fpllive.ui.auth.SignInScreen
-import com.shellanddeploy.fpllive.ui.auth.SignInViewModel
 import com.shellanddeploy.fpllive.ui.fixtures.FixturesScreen
 import com.shellanddeploy.fpllive.ui.fixtures.FixturesViewModel
 import com.shellanddeploy.fpllive.ui.gameweeks.GameweekFixturesScreen
@@ -46,6 +45,8 @@ import com.shellanddeploy.fpllive.ui.home.HomeScreen
 import com.shellanddeploy.fpllive.ui.home.HomeViewModel
 import com.shellanddeploy.fpllive.ui.leagues.LeaguesScreen
 import com.shellanddeploy.fpllive.ui.leagues.LeaguesViewModel
+import com.shellanddeploy.fpllive.ui.live.LiveScreen
+import com.shellanddeploy.fpllive.ui.live.LiveViewModel
 import com.shellanddeploy.fpllive.ui.onboarding.OnboardingScreen
 import com.shellanddeploy.fpllive.ui.onboarding.OnboardingViewModel
 import com.shellanddeploy.fpllive.ui.playerdetail.PlayerDetailScreen
@@ -83,13 +84,14 @@ private sealed class Tab(
     val icon: ImageVector,
 ) {
     data object Home : Tab("home", "home", "Home", Icons.Filled.Home)
+    data object Live : Tab("live", "live", "Live", Icons.Filled.Bolt)
     data object Players : Tab("players", "players", "Players", Icons.Filled.People)
     data object Fixtures : Tab("fixtures", "fixtures", "Fixtures", Icons.Filled.CalendarMonth)
     data object Team : Tab("team/{teamId}", "team/-1", "Team", Icons.Filled.Groups)
     data object Settings : Tab("settings", "settings", "Settings", Icons.Filled.Settings)
 }
 
-private val tabs = listOf(Tab.Home, Tab.Players, Tab.Fixtures, Tab.Team, Tab.Settings)
+private val tabs = listOf(Tab.Home, Tab.Live, Tab.Players, Tab.Fixtures, Tab.Team, Tab.Settings)
 
 @Composable
 private fun AppRoot() {
@@ -158,8 +160,13 @@ private fun MainScaffold() {
                 PlayersScreen(viewModel = vm, onPlayerClick = { id -> navController.navigate("player/$id") })
             }
 
+            composable("live") {
+                val vm: LiveViewModel = fplViewModel { LiveViewModel(it.liveRepository, it.settings) }
+                LiveScreen(viewModel = vm)
+            }
+
             composable("fixtures") {
-                val vm: FixturesViewModel = fplViewModel { FixturesViewModel(it.repository) }
+                val vm: FixturesViewModel = fplViewModel { FixturesViewModel(it.repository, it.settings.settings) }
                 FixturesScreen(viewModel = vm)
             }
 
@@ -172,13 +179,8 @@ private fun MainScaffold() {
             }
 
             composable("settings") {
-                val vm: SettingsViewModel = fplViewModel { SettingsViewModel(it.repository, it.settings, it.reminderScheduler) }
-                SettingsScreen(viewModel = vm, onSignInClick = { navController.navigate("signin") })
-            }
-
-            composable("signin") {
-                val vm: SignInViewModel = fplViewModel { SignInViewModel(it.authentication) }
-                SignInScreen(viewModel = vm, onBack = { navController.popBackStack() })
+                val vm: SettingsViewModel = fplViewModel { SettingsViewModel(it.repository, it.settings, it.reminderScheduler, it.nameSearch) }
+                SettingsScreen(viewModel = vm)
             }
 
             composable(

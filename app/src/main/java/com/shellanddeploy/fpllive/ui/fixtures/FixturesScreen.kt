@@ -16,6 +16,7 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -47,6 +48,14 @@ fun FixturesScreen(viewModel: FixturesViewModel) {
                 onSelect = viewModel::selectEvent,
             )
             ErrorBanner(state.error, Modifier.padding(horizontal = 16.dp))
+            state.squadNote?.let { note ->
+                Text(
+                    text = note,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                )
+            }
             if (state.loading) {
                 LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     items(8) { SkeletonBox(Modifier.fillMaxWidth().height(64.dp)) }
@@ -64,6 +73,8 @@ fun FixturesScreen(viewModel: FixturesViewModel) {
                             fixture = fixture,
                             homeShort = state.teamShorts[fixture.teamH] ?: "?",
                             awayShort = state.teamShorts[fixture.teamA] ?: "?",
+                            homePlayers = state.ownedPlayersByTeam[fixture.teamH] ?: emptyList(),
+                            awayPlayers = state.ownedPlayersByTeam[fixture.teamA] ?: emptyList(),
                         )
                     }
                     item {

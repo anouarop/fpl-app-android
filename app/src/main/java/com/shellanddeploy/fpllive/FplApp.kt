@@ -5,10 +5,11 @@ import com.shellanddeploy.fpllive.data.api.FplApi
 import com.shellanddeploy.fpllive.data.api.FplClient
 import com.shellanddeploy.fpllive.data.api.FplRepository
 import com.shellanddeploy.fpllive.data.api.FplRepositoryImpl
-import com.shellanddeploy.fpllive.data.auth.AuthenticationRepository
-import com.shellanddeploy.fpllive.data.auth.UnavailableAuthenticationRepository
 import com.shellanddeploy.fpllive.data.datastore.SettingsRepository
 import com.shellanddeploy.fpllive.data.db.FplDatabase
+import com.shellanddeploy.fpllive.data.live.HttpLiveRepository
+import com.shellanddeploy.fpllive.data.live.LiveRepository
+import com.shellanddeploy.fpllive.data.live.NoOpLiveRepository
 import com.shellanddeploy.fpllive.data.namesearch.HttpNameSearchRepository
 import com.shellanddeploy.fpllive.data.namesearch.NameSearchRepository
 import com.shellanddeploy.fpllive.data.namesearch.NoOpNameSearchRepository
@@ -25,9 +26,9 @@ class FplApp : Application() {
         private set
     lateinit var reminderScheduler: ReminderScheduler
         private set
-    lateinit var authentication: AuthenticationRepository
-        private set
     lateinit var nameSearch: NameSearchRepository
+        private set
+    lateinit var liveRepository: LiveRepository
         private set
 
     override fun onCreate() {
@@ -37,11 +38,15 @@ class FplApp : Application() {
         repository = FplRepositoryImpl(api, database)
         settings = SettingsRepository(this)
         reminderScheduler = WorkManagerReminderScheduler(this)
-        authentication = UnavailableAuthenticationRepository()
         nameSearch = if (BuildConfig.NAME_SEARCH_BASE_URL.isNotBlank()) {
             HttpNameSearchRepository(BuildConfig.NAME_SEARCH_BASE_URL)
         } else {
             NoOpNameSearchRepository
+        }
+        liveRepository = if (BuildConfig.LIVE_BASE_URL.isNotBlank()) {
+            HttpLiveRepository(BuildConfig.LIVE_BASE_URL)
+        } else {
+            NoOpLiveRepository
         }
     }
 }

@@ -21,7 +21,9 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -42,21 +44,25 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.shellanddeploy.fpllive.data.namesearch.ManagerMatch
 import com.shellanddeploy.fpllive.ui.components.Card
 import com.shellanddeploy.fpllive.ui.components.SectionTitle
+import com.shellanddeploy.fpllive.ui.theme.DifficultyAmber
+import com.shellanddeploy.fpllive.ui.theme.DifficultyGreen
 import kotlinx.coroutines.launch
 
 @Composable
 fun SettingsScreen(
     viewModel: SettingsViewModel,
-    onSignInClick: () -> Unit,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val cleared by viewModel.cleared.collectAsStateWithLifecycle()
+    val nameSearchState by viewModel.nameSearchState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -88,22 +94,6 @@ fun SettingsScreen(
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 16.dp),
         ) {
-            Spacer(Modifier.height(12.dp))
-
-            SectionTitle("Account")
-            Card {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    modifier = Modifier.fillMaxWidth().clickable(onClick = onSignInClick),
-                ) {
-                    Column {
-                        Text("Sign in", style = MaterialTheme.typography.titleMedium)
-                        Text("Required for transfers & private leagues", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                    Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-            }
             Spacer(Modifier.height(12.dp))
 
             SectionTitle("Appearance")
@@ -203,6 +193,48 @@ fun SettingsScreen(
                         Text("Save")
                     }
                 }
+
+                if (nameSearchState.available) {
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        "…or search by manager or team name",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = nameSearchState.query,
+                        onValueChange = viewModel::setNameQuery,
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text("Manager or team name") },
+                        leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                    )
+
+                    if (nameSearchState.loading) {
+                        Spacer(Modifier.height(12.dp))
+                        CircularProgressIndicator()
+                    }
+
+                    nameSearchState.error?.let { message ->
+                        Spacer(Modifier.height(8.dp))
+                        Text(message, style = MaterialTheme.typography.bodySmall, color = DifficultyAmber)
+                    }
+
+                    if (nameSearchState.results.isNotEmpty()) {
+                        Spacer(Modifier.height(8.dp))
+                        nameSearchState.results.forEach { match ->
+                            ManagerResultRow(match) {
+                                viewModel.selectMatch(match)
+                                scope.launch {
+                                    snackbarHostState.showSnackbar("Switched to ${match.teamName.ifBlank { match.managerName }}")
+                                }
+                            }
+                            Spacer(Modifier.height(8.dp))
+                        }
+                    }
+                }
             }
             Spacer(Modifier.height(12.dp))
 
@@ -213,6 +245,25 @@ fun SettingsScreen(
                 }
             }
             Spacer(Modifier.height(16.dp))
+        }
+    }
+}
+
+@Composable
+private fun ManagerResultRow(match: ManagerMatch, onClick: () -> Unit) {
+    Card(modifier = Modifier.clickable(onClick = onClick)) {
+        Column {
+            Text(match.managerName, style = MaterialTheme.typography.titleMedium)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                if (match.teamName.isNotBlank()) {
+                    Text(match.teamName, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                match.rank?.let { rank ->
+                    if (rank > 0) {
+                        Text("#$rank", style = MaterialTheme.typography.labelMedium, color = DifficultyGreen)
+                    }
+                }
+            }
         }
     }
 }

@@ -14,11 +14,20 @@ import androidx.compose.material3.Text
 import com.shellanddeploy.fpllive.domain.model.Fixture
 import com.shellanddeploy.fpllive.util.Format
 
+/** A squad player owned by the manager, shown under their club in a fixture. */
+data class OwnedPlayer(
+    val name: String,
+    val isCaptain: Boolean = false,
+    val isViceCaptain: Boolean = false,
+)
+
 @Composable
 fun FixtureCard(
     fixture: Fixture,
     homeShort: String,
     awayShort: String,
+    homePlayers: List<OwnedPlayer> = emptyList(),
+    awayPlayers: List<OwnedPlayer> = emptyList(),
     modifier: Modifier = Modifier,
 ) {
     val inProgress = fixture.started && !fixture.finished
@@ -30,6 +39,7 @@ fun FixtureCard(
                 DifficultyBadge(fixture.teamHDifficulty)
                 Spacer(Modifier.height(4.dp))
                 Text(homeShort, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                OwnedPlayers(homePlayers)
             }
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 if (fixture.started) {
@@ -58,7 +68,26 @@ fun FixtureCard(
                 DifficultyBadge(fixture.teamADifficulty)
                 Spacer(Modifier.height(4.dp))
                 Text(awayShort, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                OwnedPlayers(awayPlayers)
             }
         }
+    }
+}
+
+@Composable
+private fun OwnedPlayers(players: List<OwnedPlayer>) {
+    if (players.isEmpty()) return
+    Spacer(Modifier.height(6.dp))
+    players.forEach { player ->
+        Text(
+            text = when {
+                player.isCaptain -> "C ${player.name}"
+                player.isViceCaptain -> "VC ${player.name}"
+                else -> player.name
+            },
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            fontWeight = if (player.isCaptain || player.isViceCaptain) FontWeight.Bold else FontWeight.Normal,
+        )
     }
 }

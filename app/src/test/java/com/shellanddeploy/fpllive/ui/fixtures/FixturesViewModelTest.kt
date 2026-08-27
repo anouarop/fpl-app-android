@@ -1,6 +1,7 @@
 package com.shellanddeploy.fpllive.ui.fixtures
 
 import com.shellanddeploy.fpllive.data.api.FetchResult
+import com.shellanddeploy.fpllive.data.datastore.Settings
 import com.shellanddeploy.fpllive.domain.model.Bootstrap
 import com.shellanddeploy.fpllive.domain.model.Fixture
 import com.shellanddeploy.fpllive.domain.model.Gameweek
@@ -9,6 +10,7 @@ import com.shellanddeploy.fpllive.domain.model.Team
 import com.shellanddeploy.fpllive.testutil.FakeFplRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
@@ -48,7 +50,7 @@ class FixturesViewModelTest {
             )
         }
 
-        val vm = FixturesViewModel(repo)
+        val vm = FixturesViewModel(repo, flowOf(Settings()))
         advanceUntilIdle()
 
         val state = vm.state.value
@@ -67,7 +69,7 @@ class FixturesViewModelTest {
             fixturesResult = FetchResult.Success(emptyList())
         }
 
-        val vm = FixturesViewModel(repo)
+        val vm = FixturesViewModel(repo, flowOf(Settings()))
         advanceUntilIdle()
 
         vm.selectEvent(2)
@@ -84,7 +86,7 @@ class FixturesViewModelTest {
             bootstrapResult = FetchResult.Error(null, "offline")
         }
 
-        val vm = FixturesViewModel(repo)
+        val vm = FixturesViewModel(repo, flowOf(Settings()))
         advanceUntilIdle()
 
         assertEquals(0, vm.state.value.selectedEventId)

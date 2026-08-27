@@ -246,6 +246,6 @@ fun Card(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
         tonalElevation = 2.dp,
         modifier = modifier.fillMaxWidth(),
     ) {
-        Box(Modifier.padding(14.dp)) { content() }
+        Column(Modifier.padding(14.dp)) { content() }
     }
 }
