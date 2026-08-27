@@ -1,0 +1,12 @@
+{
+  "name": "fpl-live-events",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Real-time FPL goals/cards/assists by combining SofaScore live incidents with FPL scoring.",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

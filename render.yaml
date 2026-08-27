@@ -1,5 +1,11 @@
-# Render Blueprint — provisions the name-search service with one click.
+# Render Blueprint — provisions both companion services with one click.
 # Connect a GitHub repo containing this file, then choose "Create Blueprint" in Render.
+#
+# After deploying, put the resulting HTTPS URLs in gradle.properties:
+#   nameSearchBaseUrl=https://fpl-name-search.onrender.com
+#   liveBaseUrl=https://fpl-live-events.onrender.com
+#
+# (The app's release build blocks plain HTTP, so these must be HTTPS.)
 
 services:
   - type: web
@@ -15,3 +21,17 @@ services:
         value: 8080
       - key: DATA_FILE
         value: data.json
+
+  - type: web
+    name: fpl-live-events
+    runtime: node
+    rootDir: backend-live
+    plan: free
+    buildCommand: "npm install"
+    startCommand: "npm start"
+    healthCheckPath: /health
+    envVars:
+      - key: PORT
+        value: 8081
+      - key: POLL_MS
+        value: "15000"
