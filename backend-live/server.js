@@ -153,6 +153,43 @@ function goalFor(pos) {
   return GOAL_POINTS[pos] || 5;
 }
 
+// FPL clean-sheet points by element_type: GK/DEF = 4, MID = 1, FWD = 0.
+function cleanSheetPoints(pos) {
+  if (pos === 3) return 1; // mid
+  if (pos === 1 || pos === 2) return 4; // gk / def
+  return 0;
+}
+
+// elementId -> { display, pos, team } derived from bootstrap elements.
+function buildElementIndex(b) {
+  const elems = new Map();
+  for (const p of b.elements || []) {
+    elems.set(p.id, { display: p.web_name, pos: p.element_type, team: p.team });
+  }
+  return elems;
+}
+
+// Emit per-player clean-sheet events for a team that conceded 0, using FPL's live
+// per-player stats (clean_sheets > 0 and the player started). Points: GK/DEF +4, MID +1.
+function cleanSheetEvents(side, teamId, conceded, elems, fplPlayers) {
+  if (conceded !== 0) return [];
+  const out = [];
+  for (const [id, info] of elems) {
+    if (info.team !== teamId) continue;
+    const stats = fplPlayers[id];
+    if (!stats || !(Number(stats.clean_sheets) > 0) || !(Number(stats.starts) > 0)) continue;
+    const pts = cleanSheetPoints(info.pos);
+    if (pts === 0) continue;
+    out.push({
+      minute: 90,
+      type: 'cleanSheet',
+      team: side,
+      player: { fplId: id, name: info.display, points: pts },
+    });
+  }
+  return out;
+}
+
 function processIncidents(incidents, index, homeTeamId, awayTeamId) {
   const events = [];
   for (const inc of incidents) {
@@ -209,6 +246,7 @@ async function refresh() {
   const eventId = currentEventId(b);
   const teams = mapTeams(b);
   const index = buildPlayerIndex(b);
+  const elems = buildElementIndex(b);
 
   const [fixtures, sofMatches, fplPlayers] = await Promise.all([
     getFixtures(eventId),
@@ -237,6 +275,12 @@ async function refresh() {
       const incidents = await getIncidents(sof.id);
       events = processIncidents(incidents, index, f.team_h, f.team_a);
     }
+
+    // Append clean-sheet events (from FPL's live per-player stats) when a side has
+    // conceded none. These lag the fast path slightly but award the CS points.
+    events = events.concat(cleanSheetEvents('home', f.team_h, awayScore, elems, fplPlayers));
+    events = events.concat(cleanSheetEvents('away', f.team_a, homeScore, elems, fplPlayers));
+    events.sort((a, b) => (a.minute || 0) - (b.minute || 0));
 
     matches.push({
       id: f.id,

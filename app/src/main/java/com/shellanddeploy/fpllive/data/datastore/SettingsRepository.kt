@@ -67,4 +67,12 @@ class SettingsRepository(private val context: Context) {
             it[Keys.ONBOARDING_COMPLETE] = true
         }
     }
+
+    /** Forgets the linked team and returns the app to onboarding. */
+    suspend fun logout() {
+        context.dataStore.edit {
+            it[Keys.DEFAULT_TEAM_ID] = Settings.DEFAULT_TEAM_ID
+            it[Keys.ONBOARDING_COMPLETE] = false
+        }
+    }
 }

@@ -111,4 +111,10 @@ class SettingsViewModel(
             _cleared.value = true
         }
     }
+
+    fun logout() {
+        viewModelScope.launch {
+            settings.logout()
+        }
+    }
 }

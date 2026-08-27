@@ -1,5 +1,7 @@
 package com.shellanddeploy.fpllive.ui.live
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -12,6 +14,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -58,7 +61,18 @@ fun LiveScreen(viewModel: LiveViewModel) {
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    Scaffold { padding ->
+    Scaffold(
+        bottomBar = {
+            val events = state.feed?.matches.orEmpty()
+                .filter { it.live || it.events.isNotEmpty() }
+                .flatMap { it.events }
+                .distinctBy { "${it.type}-${it.playerName}-${it.minute}" }
+                .sortedByDescending { it.minute }
+            if (events.isNotEmpty()) {
+                LiveEventTicker(events = events)
+            }
+        },
+    ) { padding ->
         Column(Modifier.padding(padding).fillMaxSize().padding(horizontal = 16.dp)) {
             Spacer(Modifier.height(12.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -196,7 +210,65 @@ private fun eventLabel(type: String): Pair<String, Color> = when (type) {
     "yellow" -> "Yellow" to DifficultyAmber
     "secondYellow" -> "2nd yellow" to DifficultyRed
     "red" -> "Red" to DifficultyRed
+    "cleanSheet" -> "Clean sheet" to DifficultyGreen
     else -> type to MaterialTheme.colorScheme.onSurfaceVariant
 }
 
 private fun formatPoints(p: Int): String = if (p > 0) "+$p" else "$p"
+
+@Composable
+private fun LiveEventTicker(events: List<LiveMatchEvent>) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .padding(vertical = 8.dp),
+    ) {
+        Text(
+            text = "LIVE EVENTS",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.primary,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(horizontal = 16.dp),
+        )
+        Spacer(Modifier.height(4.dp))
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            events.forEach { event ->
+                LiveEventChip(event)
+            }
+        }
+    }
+}
+
+@Composable
+private fun LiveEventChip(event: LiveMatchEvent) {
+    val (label, color) = eventLabel(event.type)
+    val points = formatPoints(event.playerPoints)
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .background(MaterialTheme.colorScheme.surface, MaterialTheme.shapes.medium)
+            .padding(horizontal = 10.dp, vertical = 6.dp),
+    ) {
+        Pill(label, color)
+        Spacer(Modifier.width(8.dp))
+        Text(
+            text = "${event.playerName}${if (event.detail == "penalty") " (pen)" else ""}",
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.Bold,
+        )
+        Spacer(Modifier.width(8.dp))
+        Text(
+            text = points,
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.Bold,
+            color = if (event.playerPoints > 0) DifficultyGreen else DifficultyRed,
+        )
+    }
+}

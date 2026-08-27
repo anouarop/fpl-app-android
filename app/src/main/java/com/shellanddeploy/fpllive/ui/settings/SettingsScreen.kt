@@ -243,6 +243,19 @@ fun SettingsScreen(
                 OutlinedButton(onClick = viewModel::clearCache) {
                     Text("Clear cache")
                 }
+                Spacer(Modifier.height(8.dp))
+                OutlinedButton(
+                    onClick = viewModel::logout,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text("Log out (forget my team)")
+                }
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "Removes your linked team and returns to onboarding. Your team isn't deleted on FPL.",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
             Spacer(Modifier.height(16.dp))
         }
