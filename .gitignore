@@ -19,3 +19,7 @@ keystore.properties
 backend/data.json
 backend/server.log
 backend/crawl.log
+
+# Firebase service-account keys (secret) — never commit
+firebase-*.json
+google-services.json

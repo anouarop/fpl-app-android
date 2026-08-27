@@ -6,6 +6,7 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
     id("org.jetbrains.kotlin.plugin.serialization")
     id("com.google.devtools.ksp")
+    id("com.google.firebase.appdistribution")
 }
 
 android {
@@ -124,4 +125,27 @@ dependencies {
     testImplementation("androidx.room:room-testing:$roomVersion")
     testImplementation("org.robolectric:robolectric:4.14.1")
     testImplementation("androidx.test:core:1.6.1")
+}
+
+// Firebase App Distribution — configured from local.properties (git-ignored, not committed).
+// Provide: firebaseAppId=<Firebase Android App ID>, firebaseServiceCredentials=<path to SA json>,
+// firebaseTesters=<comma-separated emails or group aliases>.
+val localProps = Properties().apply {
+    val f = rootProject.file("local.properties")
+    if (f.exists()) load(f.inputStream())
+}
+val firebaseAppId = localProps.getProperty("firebaseAppId") ?: ""
+val firebaseCreds = localProps.getProperty("firebaseServiceCredentials") ?: ""
+val firebaseTesters = localProps.getProperty("firebaseTesters") ?: ""
+
+if (firebaseAppId.isNotBlank() && firebaseCreds.isNotBlank()) {
+    firebaseAppDistribution {
+        appId = firebaseAppId
+        serviceCredentialsFile = rootProject.file(firebaseCreds).absolutePath
+        artifactType = "APK"
+        groups = firebaseTesters
+        releaseNotes = providers.exec {
+            commandLine("git", "log", "-1", "--pretty=%s")
+        }.standardOutput.asText.get().trim()
+    }
 }
