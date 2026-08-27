@@ -6,6 +6,12 @@
 const fs = require('fs');
 const https = require('https');
 const zlib = require('zlib');
+const dns = require('dns');
+
+// Some hosts (e.g. Render) have no IPv6 egress. When a Postgres hostname
+// resolves to both families, force IPv4 first so `pg`/net.connect doesn't
+// pick an unreachable IPv6 address (ENETUNREACH).
+dns.setDefaultResultOrder('ipv4first');
 
 /** Lowercase + strip diacritics so "Álvarez" matches "alvarez". */
 function normalize(s) {
