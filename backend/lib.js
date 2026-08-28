@@ -104,11 +104,25 @@ function getPool() {
   }
   try {
     const { Pool } = require('pg');
+    const dns = require('dns');
+    let connectionString = url;
+    // Force IPv4: Supabase hostnames can resolve to IPv6, which Render (and
+    // some other hosts) cannot reach, causing ENETUNREACH on connect. Resolve
+    // the host to an IPv4 literal so the socket never attempts IPv6 (this is
+    // more reliable than relying on pg's `family` option alone).
+    try {
+      const host = new URL(url).hostname;
+      const ipv4 = dns.lookupSync(host, { family: 4 });
+      const u = new URL(url);
+      u.hostname = ipv4;
+      connectionString = u.toString();
+      console.log(`resolved ${host} -> ${ipv4} (forced IPv4)`);
+    } catch (e) {
+      console.log('IPv4 resolution failed, using raw URL:', e.message);
+    }
     _pool = new Pool({
-      connectionString: url,
+      connectionString,
       ssl: { rejectUnauthorized: false },
-      // Force IPv4: Supabase hostnames can resolve to IPv6, which Render (and
-      // some other hosts) cannot reach, causing ENETUNREACH on connect.
       family: 4,
       max: 5,
       // Fail fast instead of hanging if Supabase is unreachable (a hung
