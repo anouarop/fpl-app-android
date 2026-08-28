@@ -107,10 +107,16 @@ function getPool() {
     _pool = new Pool({
       connectionString: url,
       ssl: { rejectUnauthorized: false },
+      // Force IPv4: Supabase hostnames can resolve to IPv6, which Render (and
+      // some other hosts) cannot reach, causing ENETUNREACH on connect.
+      family: 4,
       max: 5,
       // Fail fast instead of hanging if Supabase is unreachable (a hung
       // connection at startup would block server.listen and cause a 502).
       connectionTimeoutMillis: 5000,
+      // Abort stalled queries (e.g. free-tier connection limits) instead of
+      // hanging the request handler forever.
+      options: '-c statement_timeout=8000 -c idle_in_transaction_session_timeout=8000',
     });
     // Never let a transient Postgres error crash the whole process.
     _pool.on('error', (e) => console.log('pg pool error:', e.message));
