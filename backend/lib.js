@@ -93,37 +93,51 @@ function saveDb(db, dataFile) {
 let _pool = null;
 let _poolInit = false;
 
+// Resolved at startup by prepareStorage(): the DATABASE_URL with its host
+// rewritten to an IPv4 literal, so `pg`/net.connect never attempts the
+// unreachable IPv6 address (Render has no IPv6 egress -> ENETUNREACH).
+let _connectionString = null;
+
+/**
+ * Resolve the DB host to an IPv4 literal. Call once at startup (before any
+ * query) so the connection string uses a plain IPv4 address. Falls back to the
+ * raw URL if resolution fails — but that path is what produced ENETUNREACH on
+ * Render, so the IPv4 literal is the real fix.
+ */
+async function prepareStorage() {
+  const url = process.env.DATABASE_URL;
+  if (!url) return;
+  try {
+    const host = new URL(url).hostname;
+    const ipv4 = await new Promise((resolve, reject) =>
+      dns.lookup(host, { family: 4 }, (err, address) =>
+        err ? reject(err) : resolve(address),
+      ),
+    );
+    const u = new URL(url);
+    u.hostname = ipv4;
+    _connectionString = u.toString();
+    console.log(`forced IPv4: ${host} -> ${ipv4}`);
+  } catch (e) {
+    console.log('IPv4 resolution failed, using raw URL:', e.message);
+    _connectionString = url;
+  }
+}
+
 /** Returns a pg Pool when DATABASE_URL is configured, else null (file fallback). */
 function getPool() {
   if (_poolInit) return _pool;
   _poolInit = true;
-  const url = process.env.DATABASE_URL;
+  const url = _connectionString || process.env.DATABASE_URL;
   if (!url) {
     _pool = null;
     return null;
   }
   try {
     const { Pool } = require('pg');
-    const dns = require('dns');
-    let connectionString = url;
-    // Force IPv4: Supabase hostnames can resolve to IPv6, which Render (and
-    // some other hosts) cannot reach, causing ENETUNREACH on connect. Resolve
-    // the host to an IPv4 literal so the socket never attempts IPv6 (this is
-    // more reliable than relying on pg's `family` option alone).
-    try {
-      const host = new URL(url).hostname;
-      const ipv4 = dns.lookupSync(host, { family: 4 });
-      const u = new URL(url);
-      u.hostname = ipv4;
-      connectionString = u.toString();
-      console.log(`resolved ${host} -> ${ipv4} (forced IPv4)`);
-    } catch (e) {
-      console.log('IPv4 resolution failed, using raw URL:', e.message);
-    }
     _pool = new Pool({
-      connectionString,
+      connectionString: url,
       ssl: { rejectUnauthorized: false },
-      family: 4,
       max: 5,
       // Fail fast instead of hanging if Supabase is unreachable (a hung
       // connection at startup would block server.listen and cause a 502).
@@ -224,6 +238,7 @@ module.exports = {
   sortManagers,
   saveDb,
   getPool,
+  prepareStorage,
   ensureSchema,
   dbLoadAll,
   dbUpsert,

@@ -20,7 +20,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const { URL } = require('url');
-const { normalize, fetchJson, loadDb, sortManagers, saveDb, getPool, ensureSchema, dbLoadAll, dbUpsert, dbSaveMeta } = require('./lib');
+const { normalize, fetchJson, loadDb, sortManagers, saveDb, getPool, prepareStorage, ensureSchema, dbLoadAll, dbUpsert, dbSaveMeta } = require('./lib');
 
 const PORT = Number(process.env.PORT) || 8080;
 const DATA_FILE = process.env.DATA_FILE || path.join(__dirname, 'data.json');
@@ -298,12 +298,15 @@ const server = http.createServer(async (req, res) => {
 // slow/unreachable the server stays up and degrades gracefully.
 server.listen(PORT, () => {
   console.log(`fpl-name-search listening on :${PORT}`);
-  console.log(`storage backend: ${getPool() ? 'Postgres (Supabase)' : 'local file (ephemeral — set DATABASE_URL)'}`);
   initDbAndCrawl();
 });
 
 function initDbAndCrawl() {
   (async () => {
+    // Resolve the DB host to an IPv4 literal BEFORE the pool is created, so the
+    // cached connection string uses IPv4 (Render has no IPv6 egress).
+    await prepareStorage();
+    console.log(`storage backend: ${getPool() ? 'Postgres (Supabase)' : 'local file (ephemeral — set DATABASE_URL)'}`);
     await ensureSchema().catch((e) => console.log('ensureSchema failed:', e.message));
     await loadFromDb().catch((e) => console.log('load failed:', e.message));
     console.log(`loaded ${db.managers.length} managers from storage`);
