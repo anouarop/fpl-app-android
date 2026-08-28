@@ -97,37 +97,73 @@ let _poolInit = false;
 // rewritten to an IPv4 literal, so `pg`/net.connect never attempts the
 // unreachable IPv6 address (Render has no IPv6 egress -> ENETUNREACH).
 let _connectionString = null;
+// Set true when DATABASE_URL is configured but Supabase is unreachable, so we
+// transparently fall back to the bundled data.json instead of erroring.
+let _useFile = false;
+
+// Quick TCP probe: can we actually reach the DB host:5432? Used to decide
+// between Postgres and the local file fallback on IPv6-only hosts (Render).
+function probeReachable(host, port) {
+  const net = require('net');
+  return new Promise((resolve) => {
+    const sock = net.connect({ host, port });
+    let done = false;
+    const finish = (ok) => {
+      if (!done) {
+        done = true;
+        sock.destroy();
+        resolve(ok);
+      }
+    };
+    sock.setTimeout(4000);
+    sock.on('connect', () => finish(true));
+    sock.on('timeout', () => finish(false));
+    sock.on('error', () => finish(false));
+  });
+}
 
 /**
- * Resolve the DB host to an IPv4 literal. Call once at startup (before any
- * query) so the connection string uses a plain IPv4 address. Falls back to the
- * raw URL if resolution fails — but that path is what produced ENETUNREACH on
- * Render, so the IPv4 literal is the real fix.
+ * Decide storage backend at startup. If DATABASE_URL is set, resolve the host
+ * to IPv4 and probe reachability; if unreachable (e.g. Supabase only has IPv6
+ * and Render has no IPv6 egress), fall back to the local data.json file.
  */
 async function prepareStorage() {
   const url = process.env.DATABASE_URL;
-  if (!url) return;
+  if (!url) return; // no DB configured -> file fallback
+  const host = new URL(url).hostname;
+  let ipv4 = null;
   try {
-    const host = new URL(url).hostname;
-    const ipv4 = await new Promise((resolve, reject) =>
+    ipv4 = await new Promise((resolve, reject) =>
       dns.lookup(host, { family: 4 }, (err, address) =>
         err ? reject(err) : resolve(address),
       ),
     );
+  } catch (_) {
+    /* no A record — likely IPv6-only */
+  }
+  const target = ipv4 || host;
+  const reachable = await probeReachable(target, 5432);
+  if (reachable) {
     const u = new URL(url);
-    u.hostname = ipv4;
+    u.hostname = target;
     _connectionString = u.toString();
-    console.log(`forced IPv4: ${host} -> ${ipv4}`);
-  } catch (e) {
-    console.log('IPv4 resolution failed, using raw URL:', e.message);
-    _connectionString = url;
+    console.log(`using Postgres at ${target}`);
+  } else {
+    _useFile = true;
+    console.log(
+      `Supabase unreachable (${target}) — Render has no IPv6 egress; falling back to local data.json`,
+    );
   }
 }
 
-/** Returns a pg Pool when DATABASE_URL is configured, else null (file fallback). */
+/** Returns a pg Pool when DATABASE_URL is configured & reachable, else null (file fallback). */
 function getPool() {
   if (_poolInit) return _pool;
   _poolInit = true;
+  if (_useFile) {
+    _pool = null;
+    return null;
+  }
   const url = _connectionString || process.env.DATABASE_URL;
   if (!url) {
     _pool = null;
