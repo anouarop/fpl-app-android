@@ -16,7 +16,9 @@ app/build/
 keystore.properties
 *.jks
 *.keystore
-backend/data.json
+# backend/data.json is committed on purpose: it's the prebuilt manager index
+# (537k managers) so the Render name-search service can serve without a Supabase
+# Postgres connection (Render has no IPv6 egress to Supabase).
 backend/server.log
 backend/crawl.log
 
